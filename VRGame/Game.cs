@@ -1,4 +1,5 @@
-﻿using SharpDX.Windows;
+﻿using SharpDX;
+using SharpDX.Windows;
 using SharpOVR;
 using System;
 using System.Collections.Generic;
@@ -53,12 +54,12 @@ namespace VRGame
             d3dDeviceContext = d3dDevice.ImmediateContext;
             using (D3D11.Texture2D backBuffer = swapChain.GetBackBuffer<D3D11.Texture2D>(0))
             {
-                renderTargetView = new D3D11.RenderTargetView(d3d11Device, backBuffer);
+                renderTargetView = new D3D11.RenderTargetView(d3dDevice, backBuffer);
             }
         }
         private void Draw()
         {
-            d3d11DeviceContext.OutputMerger.SetRenderTargets(renderTargetView);
+            d3dDeviceContext.OutputMerger.SetRenderTargets(renderTargetView);
             d3dDeviceContext.ClearRenderTargetView(renderTargetView, new SharpDX.Color(32, 103, 178));
             swapChain.Present(1, PresentFlags.None);
         }
