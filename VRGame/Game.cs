@@ -1,15 +1,20 @@
-﻿using SharpDX;
-using SharpDX.Windows;
+﻿
+using SharpDX;
+
+using SharpDX.Direct3D;
+using SharpDX.DXGI;
+using SharpDX.D3DCompiler;
+
+
 using SharpOVR;
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using System.Drawing;
-using SharpDX.DXGI;
 using D3D11 = SharpDX.Direct3D11;
-using SharpDX.Direct3D;
+using SharpDX.Windows;
 
 namespace VRGame
 {
@@ -23,11 +28,24 @@ namespace VRGame
         private D3D11.DeviceContext d3dDeviceContext;
         private SwapChain swapChain;
         private D3D11.RenderTargetView renderTargetView;
-
+        private Vector3[] vertices = new Vector3[] { new Vector3(-0.5f, 0.5f, 0.0f), new Vector3(0.5f, 0.5f, 0.0f), new Vector3(0.0f, -0.5f, 0.0f) };
+        private D3D11.Buffer triangleVertexBuffer;
+        private D3D11.VertexShader vertexShader;
+        private D3D11.PixelShader pixelShader;
+        private Viewport viewport;
+        private D3D11.InputElement[] inputElements = new D3D11.InputElement[]
+        {
+            new D3D11.InputElement("POSITION", 0, Format.R32G32B32_Float, 0)
+        };
+        private ShaderSignature inputSignature;
+        private D3D11.InputLayout inputLayout;
         public Game() {
             m_RenderForm = new RenderForm("VRWindow");
             m_RenderForm.ClientSize = new Size(m_Width, m_Height);
             m_RenderForm.AllowUserResizing = false;
+            InitializeDeviceResources();
+            InitializeShaders();
+            InitializeTriangle();
         }
         public void Run()
         {
@@ -36,7 +54,7 @@ namespace VRGame
 
         private void RenderCallback()
         {
-
+            Draw();
         }
         private void InitializeDeviceResources()
         {
@@ -56,15 +74,50 @@ namespace VRGame
             {
                 renderTargetView = new D3D11.RenderTargetView(d3dDevice, backBuffer);
             }
+            // Set viewport
+            viewport = new Viewport(0, 0, m_Width, m_Height);
+            d3dDeviceContext.Rasterizer.SetViewport(viewport);
+        }
+        private void InitializeTriangle()
+        {
+            triangleVertexBuffer = D3D11.Buffer.Create<Vector3>(d3dDevice, D3D11.BindFlags.VertexBuffer, vertices);
+        }
+        private void InitializeShaders()
+        {
+            using (var vertexShaderByteCode = ShaderBytecode.CompileFromFile("vertexShader.hlsl", "main", "vs_4_0", ShaderFlags.Debug))
+            {
+                inputSignature = ShaderSignature.GetInputSignature(vertexShaderByteCode);
+                vertexShader = new D3D11.VertexShader(d3dDevice, vertexShaderByteCode);
+            }
+            using (var pixelShaderByteCode = ShaderBytecode.CompileFromFile("pixelShader.hlsl", "main", "ps_4_0", ShaderFlags.Debug))
+            {
+                pixelShader = new D3D11.PixelShader(d3dDevice, pixelShaderByteCode);
+            }
+            d3dDeviceContext.VertexShader.Set(vertexShader);
+            d3dDeviceContext.PixelShader.Set(pixelShader);
+            d3dDeviceContext.InputAssembler.PrimitiveTopology = PrimitiveTopology.TriangleList;
+            inputLayout = new D3D11.InputLayout(d3dDevice, inputSignature, inputElements);
+            d3dDeviceContext.InputAssembler.InputLayout = inputLayout;
         }
         private void Draw()
         {
             d3dDeviceContext.OutputMerger.SetRenderTargets(renderTargetView);
             d3dDeviceContext.ClearRenderTargetView(renderTargetView, new SharpDX.Color(32, 103, 178));
+            d3dDeviceContext.InputAssembler.SetVertexBuffers(0, new D3D11.VertexBufferBinding(triangleVertexBuffer, Utilities.SizeOf<Vector3>(), 0));
+            d3dDeviceContext.Draw(vertices.Count(), 0);
             swapChain.Present(1, PresentFlags.None);
         }
         public void Dispose()
         {
+            inputLayout.Dispose();
+            inputSignature.Dispose();
+            triangleVertexBuffer.Dispose();
+            vertexShader.Dispose();
+            pixelShader.Dispose();
+            renderTargetView.Dispose();
+            swapChain.Dispose();
+            d3dDevice.Dispose();
+            d3dDeviceContext.Dispose();
             m_RenderForm.Dispose();
         }
     }
